@@ -21,3 +21,5 @@ Will add user to list
 unlikeComment(feedItemId, commentIdx, userId, cb)
 Delete /feeditem/:feedItemId/commentthread/:commentIdx/likelist/:userId
 removes user from list
+
+updating second commit-
