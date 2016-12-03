@@ -1,0 +1,23 @@
+• CommentThread: The resource for a CommentThread should be the parent resource
+of an individual comment (e.g. in /foo/bar/0, /foo/bar is the parent).
+Where should a commentthread be?
+/feeditem/:feeditemid/commentthread
+• Comment: Where should a comment be?
+/feeditem/:feeditemid/commentthread/:commentid
+• LikeList for a Comment: Where should a comment’s LikeList be?
+/feeditem/:feeditemid/commentthread/:commentid/likelist
+
+What HTTP requests do you think should be used for the following server methods?
+postComment(feedItemId, author, contents, cb)
+•Will your request still work properly if two users submit a comment at roughly the same
+time? It should!•
+Use POST, we are creating a new comment
+POST /feeditem/:feedItemId/commentthread/ {userId: author, contents: contents }
+
+likeComment(feedItemId, commentIdx, userId, cb)
+PUT /feeditem/:feedItemId/commentthread/:commentIdx/likelist/:userId
+Will add user to list
+
+unlikeComment(feedItemId, commentIdx, userId, cb)
+Delete /feeditem/:feedItemId/commentthread/:commentIdx/likelist/:userId
+removes user from list
