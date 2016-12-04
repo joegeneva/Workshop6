@@ -7,6 +7,7 @@ var express = require('express');
 var app = express();
 app.use(bodyParser.text());
 var StatusUpdateSchema = require('./schemas/statusupdate.json');
+var commentSchema = require('./schemas/comment.json');
 var validate = require('express-jsonschema').validate;
 var writeDocument = database.writeDocument;
 var addDocument = database.addDocument;
@@ -62,7 +63,9 @@ function postStatusUpdate(user, location, contents) { // If we were implementing
     writeDocument('feeds', feedData);
     // Return the newly-posted object.
     return newStatusUpdate;
-} // `POST /feeditem { userId: user, location: location, contents: contents  }`
+}
+
+ // `POST /feeditem { userId: user, location: location, contents: contents  }`
 app.post('/feeditem', validate({
     body: StatusUpdateSchema
 }), function(req, res) { // If this function runs, `req.body` passed JSON validation!
@@ -80,21 +83,81 @@ app.post('/feeditem', validate({
     }
 });
 
+//like comment
+app.put('/feeditem/:feedItemId/commentthread/:commentIdx/likelist/:author', function(req, res) {
+    var fromUser = getUserIdFromToken(req.get('Authorization'));
+    // Convert params from string to number.
+    console.log(req.params);
+    var feedItemId = parseInt(req.params.feedItemId, 10);
+    var commentIdx = parseInt(req.params.commentIdx, 10);
+    var author = parseInt(req.params.author, 10);
+    if (fromUser === author) {
+      var feedItem = database.readDocument('feedItems', feedItemId);
+      var commentThread = feedItem.comments[commentIdx];
+      if (commentThread.likeCounter.indexOf(author) === -1) {
+          commentThread.likeCounter.push(author);
+          writeDocument('feedItems', feedItem);
+      }
+      console.log(commentThread.likeCounter.map((author) =>
+          database.readDocument('users', author)));
+        // Return a resolved version of the likeCounter
+        res.send(commentThread.likeCounter.map((author) =>
+            database.readDocument('users', author)));
+    } else {
+        // 401: Unauthorized.
+        res.status(401).end();
+    }
+});
+
+
+// add a comment
+app.post('/feeditem/:feeditemid/commentthread', function(req, res) {
+    var fromUser = getUserIdFromToken(req.get('Authorization'));
+    var feedItemId = req.params.feeditemid;
+    var feedItem = database.readDocument('feedItems', feedItemId);
+    var contents = req.body.contents;
+    var author = parseInt(req.body.author, 10);
+    // Check that the requester is the author of this comment
+    console.log(req.body);
+    if (fromUser === author) {
+        // Update text content of update.
+        feedItem.comments.push({
+          "author": author,
+          "contents": contents,
+          "postDate": new Date().getTime(),
+          "likeCounter": []
+        });
+        writeDocument('feedItems', feedItem);
+        res.send(getFeedItemSync(feedItemId));
+    } else { // 401: Unauthorized.
+        res.status(401).end();
+    }
+});
+
+
+
+
+
 // Update a feed item.
-app.put('/feeditem/:feeditemid/content',function(req, res) {
-  var fromUser = getUserIdFromToken(req.get('Authorization'));
-var feedItemId = req.params.feeditemid;var feedItem = database.readDocument('feedItems', feedItemId);
-// Check that the requester is the author of this feed item.
-if(fromUser === feedItem.contents.author) {// Check that the body is a string, and not something like a JSON object.
-  // We can't use JSON validation here, since the body is simply text!
-  if(typeof(req.body) !== 'string') {// 400: Bad request.
-  res.status(400).end();return;}
-  // Update text content of update.
-  feedItem.contents.contents = req.body;writeDocument('feedItems', feedItem);
-  res.send(getFeedItemSync(feedItemId));}
-  else{// 401: Unauthorized.
-    res.status(401).end();
-  }});
+app.put('/feeditem/:feeditemid/content', function(req, res) {
+    var fromUser = getUserIdFromToken(req.get('Authorization'));
+    var feedItemId = req.params.feeditemid;
+    var feedItem = database.readDocument('feedItems', feedItemId);
+    // Check that the requester is the author of this feed item.
+    if (fromUser === feedItem.contents.author) { // Check that the body is a string, and not something like a JSON object.
+        // We can't use JSON validation here, since the body is simply text!
+        if (typeof(req.body) === 'string') { // 400: Bad request.
+            res.status(400).end();
+            return;
+        }
+        // Update text content of update.
+        feedItem.contents.contents = req.body;
+        writeDocument('feedItems', feedItem);
+        res.send(getFeedItemSync(feedItemId));
+    } else { // 401: Unauthorized.
+        res.status(401).end();
+    }
+});
 
   /***Delete a feed item.*/
   app.delete('/feeditem/:feeditemid', function(req, res) {
@@ -141,6 +204,8 @@ if(fromUser === feedItem.contents.author) {// Check that the body is a string, a
               feedItem.likeCounter.push(userId);
               writeDocument('feedItems', feedItem);
           }
+          console.log(feedItem.likeCounter.map((userId) =>
+              database.readDocument('users', userId)));
           // Return a resolved version of the likeCounter
           res.send(feedItem.likeCounter.map((userId) =>
               database.readDocument('users', userId)));
@@ -149,6 +214,37 @@ if(fromUser === feedItem.contents.author) {// Check that the body is a string, a
           res.status(401).end();
       }
   });
+
+
+
+
+  app.delete('/feeditem/:feeditemid/likelist/:userid', function(req, res) {
+      var fromUser = getUserIdFromToken(req.get('Authorization'));
+      var feedItemId = parseInt(req.params.feeditemid, 10);
+      var userId = parseInt(req.params.userid, 10);
+
+      if (fromUser === userId) {
+
+        var feedItem = readDocument('feedItems', feedItemId);
+        var comment = feedItem.comments[commentIdx];
+        var userIndex = comment.likeCounter.indexOf(userId);
+        if (userIndex !== -1) {
+          comment.likeCounter.splice(userIndex, 1);
+          writeDocument('feedItems', feedItem);
+        }
+          // Return a resolved version of the likeCounter// Note that this request succeeds even if the
+          // user already unliked the request!
+          res.send(
+            feedItem.likeCounter.map((userId) =>
+             database.readDocument('users', userId))
+           );
+      } else {
+          // 401: Unauthorized.
+          res.status(401).end();
+      }
+  });
+
+
 
   //unlikeFeedItemWe decided to map this function toDELETE /feeditem/feeditemid/likelist/userid.Add this route toserver/src/server.js:
   // Unlike a feed item.
@@ -173,6 +269,8 @@ if(fromUser === feedItem.contents.author) {// Check that the body is a string, a
           res.status(401).end();
       }
   });
+
+
 
   //searchForFeeditemsWe decided to map this route toPOST /search searchtext.Add this route toserver/src/server.js:
   // Search for feed item

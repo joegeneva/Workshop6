@@ -53,6 +53,18 @@ function getFeedItemSync(feedItemId) {
  * Adds a new comment to the database on the given feed item.
  */
 export function postComment(feedItemId, author, contents, cb) {
+    sendXHR('POST', '/feeditem/' + feedItemId + '/commentthread/', {
+      "author": author,
+      "contents": contents,
+    }, (xhr) => {
+        // Return the new status update.
+        cb(JSON.parse(xhr.responseText));
+    });
+}
+
+/**
+ * Adds a new comment to the database on the given feed item.
+export function postComment(feedItemId, author, contents, cb) {
   var feedItem = readDocument('feedItems', feedItemId);
   feedItem.comments.push({
     "author": author,
@@ -64,6 +76,7 @@ export function postComment(feedItemId, author, contents, cb) {
   // Return a resolved version of the feed item.
   emulateServerReturn(getFeedItemSync(feedItemId), cb);
 }
+*/
 
 /**
  * Updates a feed item's likeCounter by adding the user to the likeCounter.
@@ -88,18 +101,22 @@ export function postComment(feedItemId, author, contents, cb) {
 /**
  * Adds a 'like' to a comment.
  */
+
 export function likeComment(feedItemId, commentIdx, userId, cb) {
-  var feedItem = readDocument('feedItems', feedItemId);
-  var comment = feedItem.comments[commentIdx];
-  comment.likeCounter.push(userId);
-  writeDocument('feedItems', feedItem);
-  comment.author = readDocument('users', comment.author);
-  emulateServerReturn(comment, cb);
+    sendXHR('PUT', '/feeditem/' + feedItemId + '/commentthread/' + commentIdx + '/likelist/' + userId, undefined, (xhr) => {
+        cb(JSON.parse(xhr.responseText));
+    });
+}
+
+export function unComment(feedItemId, commentIdx, userId, cb) {
+    sendXHR('DELETE', '/feeditem/' + feedItemId + '/commentthread/' + commentIdx + '/likelist/' + userId, undefined, (xhr) => {
+        cb(JSON.parse(xhr.responseText));
+    });
 }
 
 /**
  * Removes a 'like' from a comment.
- */
+
 export function unlikeComment(feedItemId, commentIdx, userId, cb) {
   var feedItem = readDocument('feedItems', feedItemId);
   var comment = feedItem.comments[commentIdx];
@@ -110,7 +127,7 @@ export function unlikeComment(feedItemId, commentIdx, userId, cb) {
   }
   comment.author = readDocument('users', comment.author);
   emulateServerReturn(comment, cb);
-}
+}*/
 
 /**
  * Updates the text in a feed item (assumes a status update)
